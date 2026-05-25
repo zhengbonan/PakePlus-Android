@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="鲸鱼影视">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>鲸鱼影视</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!-- 预加载 hls.js 加速播放器初始化 -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" as="script">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+  
+  <!-- Flutter 启动优化：提前解析 main.dart.js -->
+  <link rel="preload" href="main.dart.js" as="script" crossorigin>
+  <script>
+    // Service Worker 缓存策略优化
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/flutter_service_worker.js').catch(function(err) {
+          console.log('SW registration failed: ', err);
+        });
+      });
+    }
+  </script>
+  <!-- [Optimized] 强制 iOS Safari 使用 HTML Renderer，避免 CanvasKit 性能问题 -->
+  <script>
+    window.flutterConfiguration = {
+      canvasKitBaseUrl: "/canvaskit/",
+      renderer: "html",
+    };
+  </script>
+  <script>
+    // PakePlus 环境检测：标记当前协议类型供 Flutter 读取
+    // 检测多种 PakePlus 特征：UserAgent、协议、特殊全局变量等
+    var ua = navigator.userAgent || '';
+    var isPakePlus = /PakePlus|pakeplus/i.test(ua) || 
+                     typeof window._PakePlus_ !== 'undefined' ||
+                     typeof window.flutterInAppWebViewPlatformReady !== 'undefined';
+    // 也检测是否为非标准 HTTP 环境（即使协议显示 https）
+    var isLocalFile = window.location.protocol === 'file:' || 
+                      window.location.protocol === 'app:' ||
+                      !window.location.protocol.startsWith('http');
+    window.__PAKE_PLUS_ENV__ = {
+      protocol: window.location.protocol,
+      isLocalFile: isLocalFile,
+      isPakePlus: isPakePlus,  // 新增：直接标记是否为 PakePlus
+      userAgent: ua.substring(0, 200)  // 调试用
+    };
+    console.log('[PakePlus] 环境检测:', JSON.stringify(window.__PAKE_PLUS_ENV__));
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    // iOS Safari 全屏按钮 - 最终版本
+    (function() {
+      // 检测 iOS Safari
+      function isIOSSafari() {
+        var ua = navigator.userAgent;
+        return /iPad|iPhone|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua);
+      }
+
+      if (!isIOSSafari()) {
+        return; // 非 iOS Safari,不执行
+      }
+
+      console.log('[iOS] ✅ iOS Safari 检测到,开始创建按钮');
+
+      // 创建按钮
+      var btn = document.createElement('button');
+      btn.id = 'ios-fullscreen-btn';
+      btn.innerHTML = '⛶';
+      btn.title = '全屏(原生播放器)';
+
+      // 样式 - 和调试版本类似,但更美观
+      btn.style.position = 'fixed';
+      btn.style.top = '12px';
+      btn.style.right = '12px';
+      btn.style.zIndex = '2147483647';
+      btn.style.width = '44px';
+      btn.style.height = '44px';
+      btn.style.background = 'rgba(0,0,0,0.7)';
+      btn.style.color = 'white';
+      btn.style.border = 'none';
+      btn.style.borderRadius = '8px';
+      btn.style.fontSize = '22px';
+      btn.style.cursor = 'pointer';
+      btn.style.display = 'none'; // 默认隐藏,根据检测结果显示/隐藏
+      btn.style.webkitTapHighlightColor = 'transparent';
+
+      // 附加到 body
+      document.body.appendChild(btn);
+      console.log('[iOS] ✅ 按钮已创建并附加到 body');
+
+      // 点击事件
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('[iOS] 按钮被点击,尝试全屏');
+
+        // 优先查找长视频的 video（hls-video 或有 long-video-marker 时的 video）
+        var video = document.getElementById('hls-video');
+        
+        if (!video) {
+          // 没有 hls-video，查找最近的 video 元素
+          var allVideos = document.querySelectorAll('video');
+          if (allVideos.length > 0) {
+            // 找到当前可见（尺寸最大）的 video
+            var maxArea = 0;
+            var visibleVideo = null;
+            allVideos.forEach(function(v) {
+              var rect = v.getBoundingClientRect();
+              var area = rect.width * rect.height;
+              if (area > maxArea) {
+                maxArea = area;
+                visibleVideo = v;
+              }
+            });
+            video = visibleVideo;
+          }
+        }
+
+        console.log('[iOS] 找到 video:', video);
+
+        if (video && video.webkitEnterFullscreen) {
+          console.log('[iOS] 调用 webkitEnterFullscreen');
+          video.webkitEnterFullscreen();
+        } else {
+          console.error('[iOS] 错误:video 或 webkitEnterFullscreen 不存在');
+        }
+      });
+
+      // 检测逻辑：通过 DOM 标记判断页面类型
+      // 长视频详情页会创建 #long-video-marker 元素
+      // 短视频页面没有这个标记
+      function checkAndShowButton() {
+        var video = document.querySelector('video');
+        if (!video) {
+          btn.style.display = 'none';
+          return;
+        }
+
+        // 检测长视频标记
+        var longVideoMarker = document.getElementById('long-video-marker');
+        
+        if (longVideoMarker) {
+          // 长视频页面 → 显示按钮
+          btn.style.display = 'block';
+          console.log('[iOS] 长视频页面，显示按钮');
+        } else {
+          // 短视频页面 → 隐藏按钮
+          btn.style.display = 'none';
+          console.log('[iOS] 短视频页面，隐藏按钮');
+        }
+      }
+
+      // 定时检测(每 500ms)
+      setInterval(checkAndShowButton, 500);
+
+      // 立即执行一次
+      setTimeout(checkAndShowButton, 1000);
+
+      console.log('[iOS] ✅ 初始化完成,开始监听...');
+    })();
+  </script>
+</body>
+</html>
